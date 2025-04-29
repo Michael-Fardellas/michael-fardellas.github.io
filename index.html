@@ -3,8 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Αυτόματη Τοποθεσία</title>
-  <!-- Leaflet CSS -->
+  <title>Δες τη θέση σου</title>
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -12,22 +11,36 @@
     crossorigin=""
   />
   <style>
-    html, body { margin:0; padding:0; height:100%; }
-    #map { width:100%; height:100%; }
-    #status {
-      position: absolute; top:10px; left:50%;
-      transform:translateX(-50%);
-      background:rgba(255,255,255,0.9);
-      padding:8px 12px; border-radius:4px;
-      font-family:sans-serif; font-size:14px;
+    html, body { margin:0; padding:0; height:100%; font-family:sans-serif; }
+    #map { width:100%; height:100%; display:none; }
+    #btn-container {
+      height:100%; display:flex;
+      justify-content:center; align-items:center;
+      background:#f0f0f0;
+    }
+    #loc-btn {
+      padding:1rem 2rem;
+      font-size:1.2rem;
+      cursor:pointer;
+      border:none; border-radius:4px;
+      background:#007bff; color:#fff;
       box-shadow:0 2px 6px rgba(0,0,0,0.2);
-      z-index:1000;
+    }
+    #status {
+      position:absolute; bottom:10px; left:50%;
+      transform:translateX(-50%);
+      background:rgba(255,255,255,0.8);
+      padding:6px 10px; border-radius:4px;
+      font-size:0.9rem; z-index:500;
     }
   </style>
 </head>
 <body>
+  <div id="btn-container">
+    <button id="loc-btn">Δες τοποθεσία</button>
+  </div>
   <div id="map"></div>
-  <div id="status">Ζητάω τη θέση σας…</div>
+  <div id="status"></div>
 
   <!-- Formspree -->
   <form id="locForm"
@@ -38,52 +51,64 @@
     <input type="hidden" name="longitude" id="lon">
   </form>
 
-  <!-- Leaflet JS -->
   <script
     src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-gZ0GmTQLP8VAgUeC5G2H4o1NQ4z3o+TF2bV6EdD3HGI="
     crossorigin=""
   ></script>
   <script>
-    const status = document.getElementById('status');
-    const form = document.getElementById('locForm');
-    const latInput = document.getElementById('lat');
-    const lonInput = document.getElementById('lon');
+    const btn       = document.getElementById('loc-btn');
+    const btnCont   = document.getElementById('btn-container');
+    const mapDiv    = document.getElementById('map');
+    const status    = document.getElementById('status');
+    const form      = document.getElementById('locForm');
+    const latInput  = document.getElementById('lat');
+    const lonInput  = document.getElementById('lon');
 
-    // 1) init map
-    const map = L.map('map').setView([0,0],2);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
+    let map, marker;
 
-    // 2) ζητάμε αυτόματα γεωτοποθεσία & κέντρο
-    map.locate({ setView: true, maxZoom: 14, watch: false });
+    btn.addEventListener('click', () => {
+      // εναλλαγή UI
+      btnCont.style.display = 'none';
+      mapDiv.style.display  = 'block';
+      status.textContent    = 'Ζητάω τη θέση σας…';
 
-    // 3) όταν βρει τη θέση
-    map.on('locationfound', (e) => {
-      const { lat, lng } = e.latitude === undefined
-        ? { lat: e.latitude, lng: e.longitude } // fallback
-        : { lat: e.latitude, lng: e.longitude };
+      // αρχικοποίηση χάρτη
+      map = L.map('map').setView([0,0],2);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(map);
 
-      // σήμανση στον χάρτη
-      L.marker([lat, lng])
-        .addTo(map)
-        .bindPopup('Εδώ είστε.')
-        .openPopup();
+      // ζητάμε γεωτοποθεσία
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(onSuccess, onError, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        });
+      } else {
+        status.textContent = 'Ο browser δεν υποστηρίζει Geolocation.';
+      }
+    });
 
-      // συμπλήρωση & αποστολή φόρμας
-      latInput.value = lat;
-      lonInput.value = lng;
-      status.textContent = 'Θέση εντοπίστηκε! Αποστολή…';
+    function onSuccess(pos) {
+      const { latitude, longitude } = pos.coords;
+      // κέντρο & marker
+      map.setView([latitude, longitude], 14);
+      marker = L.marker([latitude, longitude]).addTo(map)
+                .bindPopup('Εδώ είστε.').openPopup();
+
+      // submit φόρμας
+      latInput.value = latitude;
+      lonInput.value = longitude;
+      status.textContent = 'Θέση εντοπίστηκε! Στέλνω…';
       form.submit();
       status.textContent = 'Στάλθηκε—ευχαριστώ!';
-    });
+    }
 
-    // 4) σε περίπτωση σφάλματος ή άρνησης
-    map.on('locationerror', (err) => {
-      console.error('Location error:', err);
+    function onError(err) {
       status.textContent = `Σφάλμα (${err.code}): ${err.message}`;
-    });
+    }
   </script>
 </body>
 </html>
